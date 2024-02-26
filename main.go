@@ -1,59 +1,23 @@
 package main
 
 import (
-   	"context"
 	"log"
 	"net/http"
-	"os"
-	"os/signal"
 )
 
-type apiHandler struct{}
-
-func (apiHandler) ServeHTTP(http.ResponseWriter, *http.Request) {}
-
 func main() {
+	const port = "8080"
+
 	mux := http.NewServeMux()
-    corsMux := middlewareCors(mux)
+	corsMux := middlewareCors(mux)
 
-	var srv http.Server
-
-    srv.Addr = "192.168.69.175:8080"
-    srv.Handler = corsMux
-
-	idleConnsClosed := make(chan struct{})
-	go func() {
-		sigint := make(chan os.Signal, 1)
-		signal.Notify(sigint, os.Interrupt)
-		<-sigint
-
-		// We received an interrupt signal, shut down.
-		if err := srv.Shutdown(context.Background()); err != nil {
-			// Error from closing listeners, or context timeout:
-			log.Printf("HTTP server Shutdown: %v", err)
-		}
-		close(idleConnsClosed)
-	}()
-
-	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-		// Error starting or closing listener:
-		log.Fatalf("HTTP server ListenAndServe: %v", err)
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: corsMux,
 	}
 
-	<-idleConnsClosed
-
-
-
-	// mux.Handle("/api/", apiHandler{})
-	// mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-	// 	// The "/" pattern matches everything, so we need to check
-	// 	// that we're at the root here.
-	// 	if req.URL.Path != "/" {
-	// 		http.NotFound(w, req)
-	// 		return
-	// 	}
-	// 	fmt.Fprintf(w, "Welcome to the home page!")
-	// })
+	log.Printf("Serving on port: %s\n", port)
+	log.Fatal(srv.ListenAndServe())
 }
 
 func middlewareCors(next http.Handler) http.Handler {
@@ -68,4 +32,3 @@ func middlewareCors(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
-
