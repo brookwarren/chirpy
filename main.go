@@ -1,11 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
+
 	"github.com/go-chi/chi/v5"
-    "encoding/json"
-    "strings"
 )
 
 type apiConfig struct {
@@ -31,9 +32,9 @@ func main() {
 	apiRouter.Post("/validate_chirp", handlerChirpsValidate)
 	router.Mount("/api", apiRouter)
 
-    adminRouter := chi.NewRouter()
-    adminRouter.Get("/metrics", apiCfg.handlerMetrics)
-    router.Mount("/admin", adminRouter)
+	adminRouter := chi.NewRouter()
+	adminRouter.Get("/metrics", apiCfg.handlerMetrics)
+	router.Mount("/admin", adminRouter)
 
 	corsMux := middlewareCors(router)
 
@@ -46,17 +47,12 @@ func main() {
 	log.Fatal(srv.ListenAndServe())
 }
 
-
 func handlerChirpsValidate(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Body string `json:"body"`
-        ExtraFields map[string]interface{} `json:"-"` // Catch-all for extra fields
-	}
-	type cleaned struct {
-		Cleaned_Body string `json:"cleaned_body"`
 	}
 	type returnVals struct {
-		Valid bool `json:"valid"`
+		CleanedBody string `json:"cleaned_body"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -73,9 +69,28 @@ func handlerChirpsValidate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, cleaned{
-        Cleaned_Body: filterAndReplace(&params.Body),
-    })
+	badWords := map[string]struct{}{
+		"kerfuffle": {},
+		"sharbert":  {},
+		"fornax":    {},
+	}
+	cleaned := getCleanedBody(params.Body, badWords)
+
+	respondWithJSON(w, http.StatusOK, returnVals{
+		CleanedBody: cleaned,
+	})
+}
+
+func getCleanedBody(body string, badWords map[string]struct{}) string {
+	words := strings.Split(body, " ")
+	for i, word := range words {
+		loweredWord := strings.ToLower(word)
+		if _, ok := badWords[loweredWord]; ok {
+			words[i] = "****"
+		}
+	}
+	cleaned := strings.Join(words, " ")
+	return cleaned
 }
 
 func respondWithError(w http.ResponseWriter, code int, msg string) {
@@ -100,23 +115,4 @@ func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	}
 	w.WriteHeader(code)
 	w.Write(dat)
-}
-
-func filterAndReplace(input *string) string{
-
-    badWords := []string{"kerfuffle", "sharbert", "fornax"}
-    profane := false
-    words := strings.Split(*input, " ") 
-    for i, word := range words {
-        for _, badWord := range badWords {
-            if strings.ToLower(word) == badWord {
-                words[i] = "****"
-                profane = true
-            }
-        }
-    }
-    if profane {
-        *input = strings.Join(words, " ")
-    }
-    return *input
 }
