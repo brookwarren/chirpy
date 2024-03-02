@@ -50,6 +50,7 @@ func main() {
 func handlerChirpsValidate(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Body string `json:"body"`
+        ExtraFields map[string]interface{} `json:"-"` // Catch-all for extra fields
 	}
 	type cleaned struct {
 		Cleaned_Body string `json:"cleaned_body"`
@@ -72,15 +73,9 @@ func handlerChirpsValidate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-    if filterAndReplace(&params.Body) {
-	    respondWithJSON(w, http.StatusOK, cleaned{
-		    Cleaned_Body: params.Body,
-    	})
-    } else {
-    	respondWithJSON(w, http.StatusOK, returnVals{
-	    	Valid: true,
-    	})
-    }
+	respondWithJSON(w, http.StatusOK, cleaned{
+        Cleaned_Body: filterAndReplace(&params.Body),
+    })
 }
 
 func respondWithError(w http.ResponseWriter, code int, msg string) {
@@ -107,7 +102,7 @@ func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	w.Write(dat)
 }
 
-func filterAndReplace(input *string) bool {
+func filterAndReplace(input *string) string{
 
     badWords := []string{"kerfuffle", "sharbert", "fornax"}
     profane := false
@@ -123,5 +118,5 @@ func filterAndReplace(input *string) bool {
     if profane {
         *input = strings.Join(words, " ")
     }
-    return profane
+    return *input
 }
