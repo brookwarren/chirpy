@@ -108,8 +108,6 @@ func (db *DB) handlerChirpsValidate(w http.ResponseWriter, r *http.Request) {
         body: newChirp.body,
         id: newChirp.id,
 	})
-
-
 }
 
 func getCleanedBody(body string, badWords map[string]struct{}) string {
@@ -240,6 +238,8 @@ func (db *DB) loadDB() (DBStructure, error) {
 	if err != nil {
 		return DBStructure{}, err
 	}
+
+    fmt.Println(data)
 
 	var dbData DBStructure
 	err = json.Unmarshal(data, &dbData)
