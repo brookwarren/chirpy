@@ -7,6 +7,8 @@ import (
 	"sync"
 )
 
+var ErrChirpNotFound = errors.New("chirp not found")
+
 type DB struct {
 	path string
 	mu   *sync.RWMutex
@@ -63,6 +65,21 @@ func (db *DB) GetChirps() ([]Chirp, error) {
 	}
 
 	return chirps, nil
+}
+
+
+func (db *DB) GetChirpByID(id int) (Chirp, error) {
+	dbStructure, err := db.loadDB()
+	if err != nil {
+		return Chirp{}, err
+	}
+
+	chirp, ok := dbStructure.Chirps[id]
+	if !ok {
+		return Chirp{}, ErrChirpNotFound
+	}
+
+	return chirp, nil
 }
 
 func (db *DB) createDB() error {
