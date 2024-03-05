@@ -4,10 +4,29 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
-	"github.com/brookwarren/chirpy/internal/database"
 
 	"github.com/go-chi/chi/v5"
 )
+
+func (cfg *apiConfig) handlerChirpsGet(w http.ResponseWriter, r *http.Request) {
+	chirpIDString := chi.URLParam(r, "chirpID")
+	chirpID, err := strconv.Atoi(chirpIDString)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid chirp ID")
+		return
+	}
+
+	dbChirp, err := cfg.DB.GetChirp(chirpID)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Couldn't get chirp")
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, Chirp{
+		ID:   dbChirp.ID,
+		Body: dbChirp.Body,
+	})
+}
 
 func (cfg *apiConfig) handlerChirpsRetrieve(w http.ResponseWriter, r *http.Request) {
 	dbChirps, err := cfg.DB.GetChirps()
@@ -29,31 +48,5 @@ func (cfg *apiConfig) handlerChirpsRetrieve(w http.ResponseWriter, r *http.Reque
 	})
 
 	respondWithJSON(w, http.StatusOK, chirps)
-}
-
-func (cfg *apiConfig) handlerChirpsRetrieveByID(w http.ResponseWriter, r *http.Request) {
-    // Extract chirpid from URL
-    chirpID := chi.URLParam(r, "chirpid")
-
-
-    // Convert chirpid to integer
-    id, err := strconv.Atoi(chirpID)
-    if err != nil {
-        respondWithError(w, http.StatusBadRequest, "Invalid chirp ID")
-    }
-
-    // Retrieve chirp from database
-    chirp, err := cfg.DB.GetChirpByID(id)
-    if err != nil {
-        if err == database.ErrChirpNotFound {
-            respondWithError(w, http.StatusNotFound, "Chirp not found")
-            return
-        }
-        respondWithJSON(w, http.StatusOK, chirp)
-        return
-    }
-
-   	// Respond with chirp
-	respondWithJSON(w, http.StatusOK, chirp)
 }
 
