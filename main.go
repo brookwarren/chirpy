@@ -3,8 +3,12 @@ package main
 import (
 	"log"
 	"net/http"
+    "flag"
+    "os"
+    "fmt"
 
 	"github.com/brookwarren/chirpy/internal/database"
+
 	"github.com/go-chi/chi/v5"
 )
 
@@ -13,9 +17,24 @@ type apiConfig struct {
 	DB             *database.DB
 }
 
+
 func main() {
 	const filepathRoot = "."
 	const port = "8080"
+
+    dbg := flag.Bool("debug", false, "Enable debug mode")
+    flag.Parse()
+
+    if *dbg {
+        err := os.Remove("database.json")
+        if err != nil {
+            fmt.Println("Error deleting database.json:", err)
+            return
+        }
+        fmt.Println("database.json deleted successfully in debug mode")
+    } else {
+        fmt.Println("Debug mode is not enabled")
+    }
 
 	db, err := database.NewDB("database.json")
 	if err != nil {
@@ -35,6 +54,7 @@ func main() {
 	apiRouter := chi.NewRouter()
 	apiRouter.Get("/healthz", handlerReadiness)
 	apiRouter.Get("/reset", apiCfg.handlerReset)
+	apiRouter.Post("/users", apiCfg.handlerUsersCreate)
 	apiRouter.Post("/chirps", apiCfg.handlerChirpsCreate)
 	apiRouter.Get("/chirps", apiCfg.handlerChirpsRetrieve)
 	apiRouter.Get("/chirps/{chirpID}", apiCfg.handlerChirpsGet)
