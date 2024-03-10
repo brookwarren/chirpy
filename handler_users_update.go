@@ -2,20 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/brookwarren/chirpy/internal/auth"
-	"github.com/brookwarren/chirpy/internal/database"
 )
 
-type User struct {
-	ID       int    `json:"id"`
-	Email    string `json:"email"`
-	Password string `json:"-"`
-}
-
-func (cfg *apiConfig) handlerUsersCreate(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerUsersUpdate(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Password string `json:"password"`
 		Email    string `json:"email"`
@@ -24,9 +17,20 @@ func (cfg *apiConfig) handlerUsersCreate(w http.ResponseWriter, r *http.Request)
 		User
 	}
 
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't find JWT")
+		return
+	}
+	subject, err := auth.ValidateJWT(token, cfg.jwtSecret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't validate JWT")
+		return
+	}
+
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters")
 		return
@@ -38,18 +42,19 @@ func (cfg *apiConfig) handlerUsersCreate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	user, err := cfg.DB.CreateUser(params.Email, hashedPassword)
+	userIDInt, err := strconv.Atoi(subject)
 	if err != nil {
-		if errors.Is(err, database.ErrAlreadyExists) {
-			respondWithError(w, http.StatusConflict, "User already exists")
-			return
-		}
+		respondWithError(w, http.StatusInternalServerError, "Couldn't parse user ID")
+		return
+	}
 
+	user, err := cfg.DB.UpdateUser(userIDInt, params.Email, hashedPassword)
+	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create user")
 		return
 	}
 
-	respondWithJSON(w, http.StatusCreated, response{
+	respondWithJSON(w, http.StatusOK, response{
 		User: User{
 			ID:    user.ID,
 			Email: user.Email,

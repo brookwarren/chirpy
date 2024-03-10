@@ -73,8 +73,6 @@ func (db *DB) writeDB(dbStructure DBStructure) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
-    //fmt.Println(dbStructure)
-
 	dat, err := json.Marshal(dbStructure)
 	if err != nil {
 		return err
@@ -86,4 +84,3 @@ func (db *DB) writeDB(dbStructure DBStructure) error {
 	}
 	return nil
 }
-

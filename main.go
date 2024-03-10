@@ -13,15 +13,19 @@ import (
 type apiConfig struct {
 	fileserverHits int
 	DB             *database.DB
-    JwtSecret      []byte
+	jwtSecret      string
 }
 
 func main() {
-    godotenv.Load()
-
-
 	const filepathRoot = "."
 	const port = "8080"
+
+	godotenv.Load(".env")
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET environment variable is not set")
+	}
 
 	db, err := database.NewDB("database.json")
 	if err != nil {
@@ -36,14 +40,12 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-    
-    jwtSecret := os.Getenv("JWT_SECRET")
 
 	apiCfg := apiConfig{
 		fileserverHits: 0,
 		DB:             db,
-	    JwtSecret:      []byte(jwtSecret),
-    }
+		jwtSecret:      jwtSecret,
+	}
 
 	mux := http.NewServeMux()
 	fsHandler := apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot))))
@@ -53,6 +55,7 @@ func main() {
 	mux.HandleFunc("GET /api/reset", apiCfg.handlerReset)
 
 	mux.HandleFunc("POST /api/login", apiCfg.handlerLogin)
+
 	mux.HandleFunc("POST /api/users", apiCfg.handlerUsersCreate)
 	mux.HandleFunc("PUT /api/users", apiCfg.handlerUsersUpdate)
 
@@ -72,5 +75,3 @@ func main() {
 	log.Printf("Serving files from %s on port: %s\n", filepathRoot, port)
 	log.Fatal(srv.ListenAndServe())
 }
-
-

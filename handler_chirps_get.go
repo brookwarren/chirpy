@@ -4,12 +4,10 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
-
-	"github.com/go-chi/chi/v5"
 )
 
 func (cfg *apiConfig) handlerChirpsGet(w http.ResponseWriter, r *http.Request) {
-	chirpIDString := chi.URLParam(r, "chirpID")
+	chirpIDString := r.PathValue("chirpID")
 	chirpID, err := strconv.Atoi(chirpIDString)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid chirp ID")
@@ -49,4 +47,3 @@ func (cfg *apiConfig) handlerChirpsRetrieve(w http.ResponseWriter, r *http.Reque
 
 	respondWithJSON(w, http.StatusOK, chirps)
 }
-
