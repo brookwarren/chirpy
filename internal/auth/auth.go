@@ -11,6 +11,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const (
+	AccessToken  = "chirpy-access"
+	RefreshToken = "chirpy-refresh"
+)
+
 // ErrNoAuthHeaderIncluded -
 var ErrNoAuthHeaderIncluded = errors.New("not auth header included in request")
 
@@ -29,20 +34,20 @@ func CheckPasswordHash(password, hash string) error {
 }
 
 // MakeJWT -
-func MakeJWT(userID int, tokenSecret string, expiresIn time.Duration) (string, error) {
+func MakeJWT(userID int, tokenSecret string, expiresIn time.Duration, issuer string) (string, error) {
 	signingKey := []byte(tokenSecret)
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
-		Issuer:    "chirpy",
+		Issuer:    issuer,
 		IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
-		ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(expiresIn)),
+		ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(time.Hour * expiresIn)),
 		Subject:   fmt.Sprintf("%d", userID),
 	})
 	return token.SignedString(signingKey)
 }
 
 // ValidateJWT -
-func ValidateJWT(tokenString, tokenSecret string) (string, error) {
+func ValidateJWT(tokenString, tokenSecret, issuer string) (string, error) {
 	claimsStruct := jwt.RegisteredClaims{}
 	token, err := jwt.ParseWithClaims(
 		tokenString,
@@ -51,6 +56,15 @@ func ValidateJWT(tokenString, tokenSecret string) (string, error) {
 	)
 	if err != nil {
 		return "", err
+	}
+
+	issuerString, issuer_err := token.Claims.GetIssuer()
+	if issuer_err != nil {
+		return "", errors.New("problem getting issuer")
+	}
+
+	if issuerString != issuer {
+		return "", errors.New("invalid issuer")
 	}
 
 	userIDString, err := token.Claims.GetSubject()
