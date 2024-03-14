@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -11,9 +12,13 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type TokenType string
+
 const (
-	AccessToken  = "chirpy-access"
-	RefreshToken = "chirpy-refresh"
+	// TokenTypeAccess -
+	TokenTypeAccess TokenType = "chirpy-access"
+	// TokenTypeRefresh -
+	TokenTypeRefresh TokenType = "chirpy-refresh"
 )
 
 // ErrNoAuthHeaderIncluded -
@@ -34,20 +39,25 @@ func CheckPasswordHash(password, hash string) error {
 }
 
 // MakeJWT -
-func MakeJWT(userID int, tokenSecret string, expiresIn time.Duration, issuer string) (string, error) {
+func MakeJWT(
+	userID int,
+	tokenSecret string,
+	expiresIn time.Duration,
+	tokenType TokenType,
+) (string, error) {
 	signingKey := []byte(tokenSecret)
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
-		Issuer:    issuer,
+		Issuer:    string(tokenType),
 		IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
-		ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(time.Hour * expiresIn)),
+		ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(expiresIn)),
 		Subject:   fmt.Sprintf("%d", userID),
 	})
 	return token.SignedString(signingKey)
 }
 
-// ValidateJWT -
-func ValidateJWT(tokenString, tokenSecret, issuer string) (string, error) {
+// RefreshToken -
+func RefreshToken(tokenString, tokenSecret string) (string, error) {
 	claimsStruct := jwt.RegisteredClaims{}
 	token, err := jwt.ParseWithClaims(
 		tokenString,
@@ -58,18 +68,60 @@ func ValidateJWT(tokenString, tokenSecret, issuer string) (string, error) {
 		return "", err
 	}
 
-	issuerString, issuer_err := token.Claims.GetIssuer()
-	if issuer_err != nil {
-		return "", errors.New("problem getting issuer")
+	userIDString, err := token.Claims.GetSubject()
+	if err != nil {
+		return "", err
 	}
 
-	if issuerString != issuer {
+	issuer, err := token.Claims.GetIssuer()
+	if err != nil {
+		return "", err
+	}
+	if issuer != string(TokenTypeRefresh) {
 		return "", errors.New("invalid issuer")
+	}
+
+	userID, err := strconv.Atoi(userIDString)
+	if err != nil {
+		return "", err
+	}
+
+	newToken, err := MakeJWT(
+		userID,
+		tokenSecret,
+		time.Hour,
+		TokenTypeAccess,
+	)
+	if err != nil {
+		return "", err
+	}
+
+	return newToken, nil
+}
+
+// ValidateJWT -
+func ValidateJWT(tokenString, tokenSecret string) (string, error) {
+	claimsStruct := jwt.RegisteredClaims{}
+	token, err := jwt.ParseWithClaims(
+		tokenString,
+		&claimsStruct,
+		func(token *jwt.Token) (interface{}, error) { return []byte(tokenSecret), nil },
+	)
+	if err != nil {
+		return "", err
 	}
 
 	userIDString, err := token.Claims.GetSubject()
 	if err != nil {
 		return "", err
+	}
+
+	issuer, err := token.Claims.GetIssuer()
+	if err != nil {
+		return "", err
+	}
+	if issuer != string(TokenTypeAccess) {
+		return "", errors.New("invalid issuer")
 	}
 
 	return userIDString, nil

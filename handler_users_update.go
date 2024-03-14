@@ -22,13 +22,11 @@ func (cfg *apiConfig) handlerUsersUpdate(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusUnauthorized, "Couldn't find JWT")
 		return
 	}
-	subject, err := auth.ValidateJWT(token, cfg.jwtSecret, auth.AccessToken)
+	subject, err := auth.ValidateJWT(token, cfg.jwtSecret)
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, "Couldn't validate JWT")
 		return
 	}
-
-	//fmt.Println("1")
 
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
@@ -38,32 +36,23 @@ func (cfg *apiConfig) handlerUsersUpdate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	//fmt.Println("2")
-
 	hashedPassword, err := auth.HashPassword(params.Password)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't hash password")
 		return
 	}
 
-	//fmt.Println("3")
-
 	userIDInt, err := strconv.Atoi(subject)
 	if err != nil {
-		//respondWithError(w, http.StatusInternalServerError, "Couldn't parse user ID")
-		respondWithError(w, http.StatusUnauthorized, "Couldn't parse user ID")
+		respondWithError(w, http.StatusInternalServerError, "Couldn't parse user ID")
 		return
 	}
-
-	//fmt.Println("4")
 
 	user, err := cfg.DB.UpdateUser(userIDInt, params.Email, hashedPassword)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create user")
 		return
 	}
-
-	//fmt.Println("5")
 
 	respondWithJSON(w, http.StatusOK, response{
 		User: User{

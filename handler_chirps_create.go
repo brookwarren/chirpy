@@ -4,18 +4,48 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
+
+	"github.com/brookwarren/chirpy/internal/auth"
 )
 
 type Chirp struct {
-	ID   int    `json:"id"`
-	Body string `json:"body"`
+	ID        int    `json:"id"`
+	Body      string `json:"body"`
+	Author_ID int    `json:"author_id"`
 }
 
 func (cfg *apiConfig) handlerChirpsCreate(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Body string `json:"body"`
 	}
+
+	token, token_err := auth.GetBearerToken(r.Header)
+	if token_err != nil {
+		respondWithError(w, http.StatusBadRequest, "Couldn't find JWT")
+		return
+	}
+
+	isRevoked, revoked_err := cfg.DB.IsTokenRevoked(token)
+	if revoked_err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't check session")
+		return
+	}
+	if isRevoked {
+		respondWithError(w, http.StatusUnauthorized, "Refresh token is revoked")
+		return
+	}
+
+	author_id, validate_err := auth.ValidateJWT(token, cfg.jwtSecret)
+	if validate_err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't validate JWT")
+		return
+	}
+
+	authorIdInt, _ := strconv.Atoi(author_id)
+
+	// fmt.Println(author_id)
 
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
@@ -31,15 +61,16 @@ func (cfg *apiConfig) handlerChirpsCreate(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	chirp, err := cfg.DB.CreateChirp(cleaned)
+	chirp, err := cfg.DB.CreateChirp(cleaned, authorIdInt)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create chirp")
 		return
 	}
 
 	respondWithJSON(w, http.StatusCreated, Chirp{
-		ID:   chirp.ID,
-		Body: chirp.Body,
+		ID:        chirp.ID,
+		Body:      chirp.Body,
+		Author_ID: authorIdInt,
 	})
 }
 

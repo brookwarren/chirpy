@@ -39,14 +39,25 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := auth.MakeJWT(user.ID, cfg.jwtSecret, time.Duration(1), auth.AccessToken)
+	accessToken, err := auth.MakeJWT(
+		user.ID,
+		cfg.jwtSecret,
+		time.Hour,
+		auth.TokenTypeAccess,
+	)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't create JWT")
+		respondWithError(w, http.StatusInternalServerError, "Couldn't create access JWT")
 		return
 	}
-	refresh_token, err := auth.MakeJWT(user.ID, cfg.jwtSecret, time.Duration(1440), auth.RefreshToken)
+
+	refreshToken, err := auth.MakeJWT(
+		user.ID,
+		cfg.jwtSecret,
+		time.Hour*24*30*6,
+		auth.TokenTypeRefresh,
+	)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't create JWT")
+		respondWithError(w, http.StatusInternalServerError, "Couldn't create refresh JWT")
 		return
 	}
 
@@ -55,7 +66,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 			ID:    user.ID,
 			Email: user.Email,
 		},
-		Token:        token,
-		RefreshToken: refresh_token,
+		Token:        accessToken,
+		RefreshToken: refreshToken,
 	})
 }
